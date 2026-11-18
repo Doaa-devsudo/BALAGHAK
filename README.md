@@ -31,6 +31,9 @@ streamlit run app.py
 ```
 
 ## Team split
+**Start here:** [`docs/00_TEAM_WORKFLOW.md`](docs/00_TEAM_WORKFLOW.md), then your own guide:
+[RAG](docs/01_RAG.md) · [Agent](docs/02_AGENT.md) · [UI](docs/03_UI.md) · [n8n](docs/04_N8N.md)
+
 | Person | Role | Files | Branch |
 |---|---|---|---|
 | 1 | RAG | `rag.py` | `rag` |
