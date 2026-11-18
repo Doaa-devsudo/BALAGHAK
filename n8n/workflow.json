@@ -1,0 +1,265 @@
+{
+  "name": "بلاغك - إشعارات",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-report",
+        "options": {}
+      },
+      "id": "f310ca41-b24e-4627-9ed5-d2ac9c03bab8",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "0605c6be-41aa-4841-b399-240522521c83"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "17953c61-fa98-4de2-8d2c-3d55296194d2",
+                    "leftValue": "={{ $json.body.department }}",
+                    "rightValue": "الطرق والأرصفة",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c2e9e929-7097-4cb5-a24d-87ccaec72528",
+                    "leftValue": "={{ $json.body.department }}",
+                    "rightValue": "صحة البيئة والمنشآت الغذائية",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d40a5bdf-f6c4-4afc-8ffd-4b170fe34603",
+                    "leftValue": "={{ $json.body.department }}",
+                    "rightValue": "النظافة العامة",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e1bd8bd-52bc-44de-9f10-fb51c4dace9d",
+      "name": "Switch (department)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5366811545",
+        "text": "=🔔 بلاغ جديد {{ $json.body.id }}\nالقسم: {{ $json.body.department }}\nالأولوية: {{ $json.body.priority }}\nالموقع: {{ $json.body.neighborhood }} - {{ $json.body.street }}\nالمنشأة: {{ $json.body.facility }}\nالوصف: {{ $json.body.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "cfc16220-f964-48ac-9b2b-6e5177d7b40e",
+      "name": "Telegram - فريق الطرق",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5519896223",
+        "text": "=🔔 بلاغ جديد {{ $json.body.id }}\nالقسم: {{ $json.body.department }}\nالأولوية: {{ $json.body.priority }}\nالموقع: {{ $json.body.neighborhood }} - {{ $json.body.street }}\nالمنشأة: {{ $json.body.facility }}\nالوصف: {{ $json.body.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "070f4874-02f8-4ecc-ab1d-b5bab8061715",
+      "name": "Telegram - فريق الرقابة الصحية",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5186008123",
+        "text": "=🔔 بلاغ جديد {{ $json.body.id }}\nالقسم: {{ $json.body.department }}\nالأولوية: {{ $json.body.priority }}\nالموقع: {{ $json.body.neighborhood }} - {{ $json.body.street }}\nالمنشأة: {{ $json.body.facility }}\nالوصف: {{ $json.body.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "2df01134-7073-4ad0-90e0-e7fd88820085",
+      "name": "Telegram - فريق النظافة",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c7b051a8-e3ca-4bb9-8394-1122317f5f21",
+              "leftValue": "={{ $json.body.priority }}",
+              "rightValue": "عاجلة",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f050c889-142c-4fe6-8057-e4888781a539",
+      "name": "If (urgent)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5272745623",
+        "text": "=🚨 بلاغ عاجل {{ $json.body.id }}\nالقسم: {{ $json.body.department }}\nالموقع: {{ $json.body.neighborhood }} - {{ $json.body.street }}\nالمنشأة: {{ $json.body.facility }}\nالوصف: {{ $json.body.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1a38255e-a35a-4480-bbb3-6e12f079417c",
+      "name": "Telegram - المشرف",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch (department)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If (urgent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (department)": {
+      "main": [
+        [
+          {
+            "node": "Telegram - فريق الطرق",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - فريق الرقابة الصحية",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - فريق النظافة",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (urgent)": {
+      "main": [
+        [
+          {
+            "node": "Telegram - المشرف",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
