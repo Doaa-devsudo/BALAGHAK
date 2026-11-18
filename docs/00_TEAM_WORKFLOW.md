@@ -66,7 +66,7 @@ source venv/bin/activate            # Mac/Linux
 
 pip install -r requirements.txt
 cp .env.example .env
-nano .env                           # put the real OPENAI_API_KEY (ask the team)
+nano .env                           # put the real GOOGLE_API_KEY (Gemini, ask the team)
 ```
 
 Check that everything runs:

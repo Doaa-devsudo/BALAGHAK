@@ -14,7 +14,7 @@ priority, and saves the report. It's the core of the project.
 ## Before you start
 1. Setup in `docs/00_TEAM_WORKFLOW.md` → section 1.
 2. `git checkout -b agent`
-3. `.env` has `OPENAI_API_KEY`.
+3. `.env` has `GOOGLE_API_KEY` and `GEMINI_MODEL`.
 4. Read `storage.py` (`add_report` and the constants) and one guideline file in `data/guidelines/`.
 5. Run the stub: `python agent.py` opens a terminal chat. Type `exit` to quit.
 
@@ -66,12 +66,21 @@ This is where most of the behavior comes from. It should say, in order:
 Use what your program taught you. Example with LangChain 1.x:
 ```python
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
+import os
+from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+load_dotenv()
+llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), temperature=0)
 _agent = create_agent(model=llm, tools=[search_guidelines_tool, save_report], system_prompt=SYSTEM_PROMPT)
 ```
 - `temperature=0` so classification is stable.
+- The model name comes from `.env` (`GEMINI_MODEL`), so you can switch models without touching code.
+  If you get a "model not found" error, pick another name from the model list in Google AI Studio.
+- Gemini's free tier has a per-minute request limit. Each user message can be 2–3 calls
+  (search, save, answer), so don't spam tests; if you hit a 429 error, wait a minute.
+- Gemini sometimes returns `content` as a list of parts instead of a string. In `run_agent`,
+  if the content is a list, join the `text` of each part before returning it.
 - Create the agent **once** at module level, not inside `run_agent`.
 - If your program used LangGraph's `create_react_agent` or `AgentExecutor`, that's fine. Only `run_agent` must keep its contract.
 

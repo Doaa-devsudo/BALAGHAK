@@ -12,7 +12,7 @@ The agent uses this to decide **which department** and **which priority**.
 ## Before you start
 1. Do the setup in `docs/00_TEAM_WORKFLOW.md` → section 1.
 2. `git checkout -b rag`
-3. Make sure `.env` has `OPENAI_API_KEY` (the embeddings need it).
+3. Make sure `.env` has `GOOGLE_API_KEY` (Gemini; the embeddings need it).
 4. Read the 3 files in `data/guidelines/`. Notice they all have the same sections.
 5. Run the stub: `python rag.py`. Right now every query returns the roads guideline. Your job is to fix that.
 
@@ -35,13 +35,13 @@ get_guideline(department: str) -> str     # already done in the stub, keep it
 ```python
 from dotenv import load_dotenv
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
 load_dotenv()
 ```
-(If your program used another provider, e.g. Google, use its embeddings class instead.
-The rest stays the same.)
+`GoogleGenerativeAIEmbeddings` reads `GOOGLE_API_KEY` from the environment automatically
+(that's what `load_dotenv()` is for). `gemini-embedding-001` handles Arabic.
 
 ### 2. Load the guidelines as documents
 Write `_load_documents() -> list[Document]`:
@@ -56,7 +56,7 @@ _vectorstore = None
 def _get_vectorstore():
     global _vectorstore
     if _vectorstore is None:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
         _vectorstore = FAISS.from_documents(_load_documents(), embeddings)
     return _vectorstore
 ```
