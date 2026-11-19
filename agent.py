@@ -135,8 +135,10 @@ def _get_agent():
         if not os.getenv("GOOGLE_API_KEY"):
             raise RuntimeError("GOOGLE_API_KEY is missing in .env")
         llm = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
             temperature=0,
+            timeout=60,       # seconds per Gemini call, so it never hangs forever
+            max_retries=1,
         )
         _agent = create_agent(model=llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
     return _agent
@@ -166,6 +168,8 @@ def run_agent(user_input: str, history: list[dict]) -> str:
         print("[agent] error:", error)
         if "429" in str(error) or "RESOURCE_EXHAUSTED" in str(error):
             return "الخدمة مشغولة حاليًا، حاول بعد دقيقة."
+        if "timeout" in str(error).lower() or "timed out" in str(error).lower():
+            return "الخدمة تأخرت في الرد، حاول مرة ثانية."
         return "صار خطأ أثناء معالجة البلاغ، حاول مرة ثانية."
 
 
@@ -178,6 +182,7 @@ if __name__ == "__main__":
             break
         if not msg:
             continue
+        print("...جاري المعالجة")
         reply = run_agent(msg, history)
         print("بلاغك:", reply)
         history += [{"role": "user", "content": msg}, {"role": "assistant", "content": reply}]
