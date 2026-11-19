@@ -19,6 +19,7 @@ import os
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
+from langchain.agents.middleware import ModelRetryMiddleware
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
@@ -128,6 +129,17 @@ SYSTEM_PROMPT = f"""أنت «بلاغك»، مساعد يستقبل البلاغ
 
 _agent = None
 
+# Gemini is sometimes busy (503 UNAVAILABLE) or too slow (504 DEADLINE_EXCEEDED).
+# These are temporary, so we retry each model call. The retry is per model call,
+# NOT around the whole agent, so a report that was already saved is never saved twice.
+_TEMPORARY_ERRORS = ("503", "504", "UNAVAILABLE", "DEADLINE_EXCEEDED", "high demand",
+                     "429", "RESOURCE_EXHAUSTED", "timed out", "timeout")
+
+
+def _is_temporary(error: Exception) -> bool:
+    text = str(error)
+    return any(marker.lower() in text.lower() for marker in _TEMPORARY_ERRORS)
+
 
 def _build_agent(checkpointer=None):
     if not os.getenv("GOOGLE_API_KEY"):
@@ -136,10 +148,18 @@ def _build_agent(checkpointer=None):
         model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
         temperature=0,
         timeout=60,
-        max_retries=1,
+        max_retries=0,  # retries are handled by ModelRetryMiddleware below
+    )
+    retry = ModelRetryMiddleware(
+        max_retries=3,          # up to 4 attempts per model call
+        retry_on=_is_temporary,
+        on_failure="error",     # after the last attempt, raise -> chat_error_message
+        initial_delay=2.0,      # wait 2s, 4s, 8s between attempts
+        backoff_factor=2.0,
     )
     return create_agent(
-        model=llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT, checkpointer=checkpointer
+        model=llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT,
+        middleware=[retry], checkpointer=checkpointer,
     )
 
 
@@ -182,10 +202,8 @@ def run_agent(user_input: str, history: list[dict]) -> str:
 
 def chat_error_message(error: Exception) -> str:
     print("[agent] error:", error)
-    if "429" in str(error) or "RESOURCE_EXHAUSTED" in str(error):
+    if _is_temporary(error):
         return "الخدمة مشغولة حاليًا، حاول بعد دقيقة."
-    if "timeout" in str(error).lower() or "timed out" in str(error).lower():
-        return "الخدمة تأخرت في الرد، حاول مرة ثانية."
     return "صار خطأ أثناء معالجة البلاغ، حاول مرة ثانية."
 
 
