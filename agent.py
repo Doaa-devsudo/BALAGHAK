@@ -2,9 +2,9 @@
 
 How it works
 ------------
-This is a tool-calling agent: the LLM (Gemini) decides by itself when to use each tool.
+This is a tool-calling agent: the LLM (via OpenRouter) decides by itself when to use each tool.
 
-  1. search_guidelines  -> RAG over the 3 department guidelines (rag.py)
+  1. search_guidelines  -> reads the 3 department guidelines (rag.py)
                            used to choose the department and the priority
   2. save_report        -> saves the report (storage.py) and notifies the team (notify.py)
 
@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelRetryMiddleware
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
 import notify
@@ -129,11 +129,10 @@ SYSTEM_PROMPT = f"""أنت «بلاغك»، مساعد يستقبل البلاغ
 
 _agent = None
 
-# Gemini is sometimes busy (503 UNAVAILABLE) or too slow (504 DEADLINE_EXCEEDED).
+# Retry temporary OpenRouter and upstream provider errors.
 # These are temporary, so we retry each model call. The retry is per model call,
 # NOT around the whole agent, so a report that was already saved is never saved twice.
-_TEMPORARY_ERRORS = ("503", "504", "UNAVAILABLE", "DEADLINE_EXCEEDED", "high demand",
-                     "429", "RESOURCE_EXHAUSTED", "timed out", "timeout")
+_TEMPORARY_ERRORS = ("429", "502", "503", "504", "timed out", "timeout")
 
 
 def _is_temporary(error: Exception) -> bool:
@@ -141,34 +140,38 @@ def _is_temporary(error: Exception) -> bool:
     return any(marker.lower() in text.lower() for marker in _TEMPORARY_ERRORS)
 
 
-def _make_llm():
-    """Gemini by default. If LLM_BASE_URL is set in .env, use an OpenAI-compatible API instead
-    (e.g. OpenRouter, or the endpoint given by the instructors)."""
-    base_url = os.getenv("LLM_BASE_URL", "").strip()
-    if base_url:
-        from langchain_openai import ChatOpenAI
-        if not os.getenv("LLM_API_KEY"):
-            raise RuntimeError("LLM_API_KEY is missing in .env")
-        return ChatOpenAI(
-            base_url=base_url,
-            api_key=os.getenv("LLM_API_KEY"),
-            model=os.getenv("LLM_MODEL"),
-            temperature=0,
-            timeout=60,
-            max_retries=0,  # retries are handled by ModelRetryMiddleware
-        )
-    if not os.getenv("GOOGLE_API_KEY"):
-        raise RuntimeError("GOOGLE_API_KEY is missing in .env")
-    return ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+def create_chat_model() -> ChatOpenAI:
+    """Build the OpenRouter client or use an explicitly configured compatible endpoint."""
+    custom_url = os.getenv("LLM_BASE_URL", "").strip()
+    if custom_url:
+        base_url = custom_url
+        key_name, model_name = "LLM_API_KEY", "LLM_MODEL"
+        model = os.getenv(model_name, "").strip()
+    else:
+        base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        key_name, model_name = "OPENROUTER_API_KEY", "OPENROUTER_MODEL"
+        model = os.getenv(model_name, "inclusionai/ling-3.2-flash:free").strip()
+
+    api_key = os.getenv(key_name, "").strip()
+    if not api_key:
+        raise RuntimeError(f"{key_name} is missing in .env")
+    if not model:
+        raise RuntimeError(f"{model_name} is missing in .env")
+    is_openrouter = base_url.rstrip("/") == "https://openrouter.ai/api/v1"
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
         temperature=0,
         timeout=60,
-        max_retries=0,  # retries are handled by ModelRetryMiddleware
+        max_retries=0,  # agent retries are handled by ModelRetryMiddleware
+        use_responses_api=False,
+        extra_body={"reasoning": {"enabled": False}} if is_openrouter else None,
     )
 
 
 def _build_agent(checkpointer=None):
-    llm = _make_llm()
+    llm = create_chat_model()
     retry = ModelRetryMiddleware(
         max_retries=3,          # up to 4 attempts per model call
         retry_on=_is_temporary,
@@ -196,7 +199,7 @@ def _get_agent():
 
 
 def content_to_text(content) -> str:
-    """Gemini sometimes returns a list of parts instead of a string."""
+    """The model can return a list of parts instead of a string."""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -220,7 +223,7 @@ def run_agent(user_input: str, history: list[dict]) -> str:
 
 
 def chat_error_message(error: Exception) -> str:
-    print("[agent] error:", error)
+    print("[agent] error:", type(error).__name__, getattr(error, "status_code", ""))
     if _is_temporary(error):
         return "الخدمة مشغولة حاليًا، حاول بعد دقيقة."
     return "صار خطأ أثناء معالجة البلاغ، حاول مرة ثانية."

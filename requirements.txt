@@ -1,10 +1,7 @@
 streamlit
 langchain
 langgraph
-langchain-google-genai
-langchain-community
-faiss-cpu
+langchain-openai
 python-dotenv
 requests
 pandas
-langchain-openai
