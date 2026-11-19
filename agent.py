@@ -141,15 +141,34 @@ def _is_temporary(error: Exception) -> bool:
     return any(marker.lower() in text.lower() for marker in _TEMPORARY_ERRORS)
 
 
-def _build_agent(checkpointer=None):
+def _make_llm():
+    """Gemini by default. If LLM_BASE_URL is set in .env, use an OpenAI-compatible API instead
+    (e.g. OpenRouter, or the endpoint given by the instructors)."""
+    base_url = os.getenv("LLM_BASE_URL", "").strip()
+    if base_url:
+        from langchain_openai import ChatOpenAI
+        if not os.getenv("LLM_API_KEY"):
+            raise RuntimeError("LLM_API_KEY is missing in .env")
+        return ChatOpenAI(
+            base_url=base_url,
+            api_key=os.getenv("LLM_API_KEY"),
+            model=os.getenv("LLM_MODEL"),
+            temperature=0,
+            timeout=60,
+            max_retries=0,  # retries are handled by ModelRetryMiddleware
+        )
     if not os.getenv("GOOGLE_API_KEY"):
         raise RuntimeError("GOOGLE_API_KEY is missing in .env")
-    llm = ChatGoogleGenerativeAI(
+    return ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
         temperature=0,
         timeout=60,
-        max_retries=0,  # retries are handled by ModelRetryMiddleware below
+        max_retries=0,  # retries are handled by ModelRetryMiddleware
     )
+
+
+def _build_agent(checkpointer=None):
+    llm = _make_llm()
     retry = ModelRetryMiddleware(
         max_retries=3,          # up to 4 attempts per model call
         retry_on=_is_temporary,
