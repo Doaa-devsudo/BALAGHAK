@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.checkpoint.memory import InMemorySaver
 
 import notify
 import rag
@@ -128,23 +129,34 @@ SYSTEM_PROMPT = f"""أنت «بلاغك»، مساعد يستقبل البلاغ
 _agent = None
 
 
+def _build_agent(checkpointer=None):
+    if not os.getenv("GOOGLE_API_KEY"):
+        raise RuntimeError("GOOGLE_API_KEY is missing in .env")
+    llm = ChatGoogleGenerativeAI(
+        model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+        temperature=0,
+        timeout=60,
+        max_retries=1,
+    )
+    return create_agent(
+        model=llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT, checkpointer=checkpointer
+    )
+
+
+def create_chat_agent():
+    """Create a graph and checkpoint store owned by one Streamlit session."""
+    return _build_agent(checkpointer=InMemorySaver())
+
+
 def _get_agent():
-    """Create the agent once (on first use), then reuse it."""
+    """Reuse the stateless agent for callers that supply their own history."""
     global _agent
     if _agent is None:
-        if not os.getenv("GOOGLE_API_KEY"):
-            raise RuntimeError("GOOGLE_API_KEY is missing in .env")
-        llm = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
-            temperature=0,
-            timeout=60,       # seconds per Gemini call, so it never hangs forever
-            max_retries=1,
-        )
-        _agent = create_agent(model=llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
+        _agent = _build_agent()
     return _agent
 
 
-def _content_to_text(content) -> str:
+def content_to_text(content) -> str:
     """Gemini sometimes returns a list of parts instead of a string."""
     if isinstance(content, str):
         return content
@@ -162,15 +174,19 @@ def run_agent(user_input: str, history: list[dict]) -> str:
     messages.append({"role": "user", "content": user_input})
     try:
         result = _get_agent().invoke({"messages": messages})
-        reply = _content_to_text(result["messages"][-1].content).strip()
+        reply = content_to_text(result["messages"][-1].content).strip()
         return reply or "عذرًا، ما فهمت. ممكن توضح البلاغ أكثر؟"
     except Exception as error:
-        print("[agent] error:", error)
-        if "429" in str(error) or "RESOURCE_EXHAUSTED" in str(error):
-            return "الخدمة مشغولة حاليًا، حاول بعد دقيقة."
-        if "timeout" in str(error).lower() or "timed out" in str(error).lower():
-            return "الخدمة تأخرت في الرد، حاول مرة ثانية."
-        return "صار خطأ أثناء معالجة البلاغ، حاول مرة ثانية."
+        return chat_error_message(error)
+
+
+def chat_error_message(error: Exception) -> str:
+    print("[agent] error:", error)
+    if "429" in str(error) or "RESOURCE_EXHAUSTED" in str(error):
+        return "الخدمة مشغولة حاليًا، حاول بعد دقيقة."
+    if "timeout" in str(error).lower() or "timed out" in str(error).lower():
+        return "الخدمة تأخرت في الرد، حاول مرة ثانية."
+    return "صار خطأ أثناء معالجة البلاغ، حاول مرة ثانية."
 
 
 if __name__ == "__main__":
