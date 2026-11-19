@@ -1,0 +1,16 @@
+[theme]
+baseRadius = "large"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.light]
+primaryColor = "#007D70"
+backgroundColor = "#FFFCF6"
+secondaryBackgroundColor = "#EAF6EF"
+textColor = "#193A35"
+
+[theme.dark]
+primaryColor = "#61E4BE"
+backgroundColor = "#101F23"
+secondaryBackgroundColor = "#1A3337"
+textColor = "#EFFBF6"

@@ -7,10 +7,29 @@ TODO: filters, metrics, charts, repeated reports, report detail + suggested acti
 import pandas as pd
 import streamlit as st
 
-from storage import load_reports
+from storage import PRIORITIES, STATUSES, load_reports
 
-st.title("لوحة المشرف")
+st.html("""
+<section class="balaghak-hero" lang="ar" dir="rtl">
+    <span class="hero-icon" aria-hidden="true">📊</span>
+    <h1>لوحة المشرف</h1>
+    <p>تابع البلاغات البلدية وراجع الحالات العاجلة.</p>
+</section>
+""")
 
-df = pd.DataFrame(load_reports())
-st.write(f"عدد البلاغات: {len(df)}")
-st.dataframe(df, use_container_width=True)
+reports = load_reports()
+total, urgent, closed = st.columns(3)
+total.metric("📋 إجمالي البلاغات", len(reports), border=True)
+urgent.metric(
+    "🚨 البلاغات العاجلة",
+    sum(report.get("priority") == PRIORITIES[0] for report in reports),
+    border=True,
+)
+closed.metric(
+    "✅ البلاغات المغلقة",
+    sum(report.get("status") == STATUSES[-1] for report in reports),
+    border=True,
+)
+
+st.subheader("سجل البلاغات")
+st.dataframe(pd.DataFrame(reports), width="stretch", hide_index=True)
